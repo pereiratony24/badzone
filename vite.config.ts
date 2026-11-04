@@ -8,4 +8,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    host: true, // Permet d'accéder au site depuis la tablette via le réseau Wi-Fi
+    allowedHosts: true, // Autorise localtunnel et tous les sous-domaines
+  },
 });
