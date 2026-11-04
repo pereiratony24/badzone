@@ -3,6 +3,7 @@ import { supabase } from './lib/supabaseClient';
 import AttendanceHub from './components/AttendanceHub';
 import KioskAttendance from './components/KioskAttendance';
 import AttendanceModule from './components/AttendanceModule';
+import TournamentModule from './components/TournamentModule';
 import BatteryIndicator from './components/BatteryIndicator';
 import { 
   Users, 
@@ -105,7 +106,7 @@ function ShuttlecockIcon({ className = "w-20 h-20" }: { className?: string }) {
 
 export default function App() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<'home' | 'attendance_hub' | 'kiosk' | 'attendance_admin'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'attendance_hub' | 'kiosk' | 'attendance_admin' | 'tournament'>('home');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('badzone_theme') === 'dark';
   });
@@ -180,8 +181,8 @@ export default function App() {
       subtitle: 'Poules, élimination & direct',
       description: 'Création modulaire selon les présents (poules, arbre), gestion au temps ou aux points et scores en direct.',
       icon: Trophy,
-      gradient: 'from-[#4FACFE] to-[#00F2FE]',
-      shadow: 'shadow-cyan-500/25',
+      gradient: 'from-blue-600 via-indigo-600 to-cyan-500',
+      shadow: 'shadow-blue-500/25',
       features: ['Poules & Arbres auto', 'Temps ou points', 'Affichage direct']
     }
   ];
@@ -270,6 +271,8 @@ export default function App() {
         />
       ) : currentView === 'attendance_admin' ? (
         <AttendanceModule onBack={() => setCurrentView('attendance_hub')} isDarkMode={isDarkMode} />
+      ) : currentView === 'tournament' ? (
+        <TournamentModule onBack={() => setCurrentView('home')} isDarkMode={isDarkMode} />
       ) : (
         <main className="relative z-10 flex-1 w-full flex flex-col justify-center items-center px-6 min-h-0 overflow-hidden">
           <div className="w-full max-w-6xl flex flex-col items-center justify-center min-h-0">
@@ -301,6 +304,8 @@ export default function App() {
                     onClick={() => {
                       if (mod.id === 'attendance') {
                         setCurrentView('attendance_hub');
+                      } else if (mod.id === 'tournament') {
+                        setCurrentView('tournament');
                       } else {
                         setActiveModule(mod.id);
                       }
@@ -351,6 +356,8 @@ export default function App() {
                           e.stopPropagation();
                           if (mod.id === 'attendance') {
                             setCurrentView('attendance_hub');
+                          } else if (mod.id === 'tournament') {
+                            setCurrentView('tournament');
                           } else {
                             setActiveModule(mod.id);
                           }
