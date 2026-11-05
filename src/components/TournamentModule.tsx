@@ -18,8 +18,11 @@ import {
   X,
   Shuffle,
   ArrowRight,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Grid3X3,
+  GitBranch
 } from 'lucide-react';
+import { determineTournamentStructure, type TournamentStructure } from '../utils/tournamentEngine';
 
 interface TournamentModuleProps {
   onBack: () => void;
@@ -64,12 +67,163 @@ interface SelectedPlayerTarget {
   name: string;
 }
 
+interface BracketMatchNode {
+  id: string;
+  p1: string;
+  p2: string;
+  score1?: number;
+  score2?: number;
+  winner?: string;
+}
+
+interface BracketRound {
+  title: string;
+  matches: BracketMatchNode[];
+}
+
+function TournamentBracketView({ rounds, isDarkMode }: { rounds: BracketRound[]; isDarkMode: boolean }) {
+  const firstRoundMatches = rounds[0]?.matches.length || 4;
+  const canvasHeight = Math.max(720, firstRoundMatches * 110);
+  const cardWidth = 240;
+  const connectorWidth = 56;
+
+  return (
+    <div className="w-full h-full overflow-auto select-none p-2 sm:p-4 flex flex-col no-scrollbar">
+      {/* En-tête des étapes épuré, moderne et sans ligne parasite */}
+      <div className="flex items-center pb-4 mb-2 shrink-0 min-w-max">
+        {rounds.map((round, rIdx) => {
+          const isFinal = rIdx === rounds.length - 1;
+          return (
+            <div 
+              key={rIdx} 
+              style={{ width: `${cardWidth}px`, marginRight: isFinal ? 0 : `${connectorWidth}px` }}
+              className="flex justify-center shrink-0"
+            >
+              <div className={`px-4 py-1.5 rounded-xl border flex items-center space-x-2 shadow-xs transition-all ${
+                isFinal 
+                  ? 'bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-amber-500/15 border-amber-500/40 text-amber-400 shadow-amber-500/10' 
+                  : isDarkMode 
+                  ? 'bg-slate-800/80 border-slate-700/70 text-slate-300' 
+                  : 'bg-white border-slate-200 text-slate-700 shadow-slate-100'
+              }`}>
+                {isFinal ? (
+                  <Trophy className="w-3.5 h-3.5 text-amber-400 stroke-[2.5]" />
+                ) : (
+                  <div className={`w-1.5 h-1.5 rounded-full ${isDarkMode ? 'bg-blue-400' : 'bg-blue-600'}`} />
+                )}
+                <span className="text-[11px] font-black uppercase tracking-wider">
+                  {round.title}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Arbre avec cartes et fourches de liaison SVG */}
+      <div 
+        className="flex items-stretch min-w-max relative flex-1"
+        style={{ height: `${canvasHeight}px` }}
+      >
+        {rounds.map((round, rIdx) => {
+          const isFinal = rIdx === rounds.length - 1;
+          const currentCount = round.matches.length;
+          const nextCount = !isFinal ? rounds[rIdx + 1].matches.length : 0;
+
+          return (
+            <div key={rIdx} className="flex items-stretch shrink-0">
+              
+              <div 
+                style={{ width: `${cardWidth}px` }} 
+                className="flex flex-col justify-around py-2 shrink-0"
+              >
+                {round.matches.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`rounded-2xl border shadow-sm transition-all overflow-hidden ${
+                      isDarkMode 
+                        ? 'bg-slate-900 border-slate-700/80 text-white shadow-black/40' 
+                        : 'bg-white border-slate-300 text-slate-900 shadow-slate-200'
+                    }`}
+                  >
+                    <div className={`px-3 py-2 flex items-center justify-between border-b ${
+                      isDarkMode ? 'border-slate-800' : 'border-slate-100'
+                    }`}>
+                      <div className="flex items-center space-x-2 truncate pr-2">
+                        <span className="text-[10px] text-slate-500 font-mono font-bold">1</span>
+                        <span className="text-xs truncate font-bold text-slate-300">{m.p1}</span>
+                      </div>
+                      <span className={`text-xs font-mono font-black px-1.5 py-0.5 rounded ${
+                        isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        -
+                      </span>
+                    </div>
+
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <div className="flex items-center space-x-2 truncate pr-2">
+                        <span className="text-[10px] text-slate-500 font-mono font-bold">2</span>
+                        <span className="text-xs truncate font-bold text-slate-300">{m.p2}</span>
+                      </div>
+                      <span className={`text-xs font-mono font-black px-1.5 py-0.5 rounded ${
+                        isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        -
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {!isFinal && (
+                <div 
+                  style={{ width: `${connectorWidth}px` }} 
+                  className="h-full shrink-0 relative"
+                >
+                  <svg 
+                    className="w-full h-full overflow-visible" 
+                    viewBox={`0 0 ${connectorWidth} ${canvasHeight}`}
+                  >
+                    {Array.from({ length: nextCount }).map((_, targetIdx) => {
+                      const yTop = (canvasHeight * (targetIdx * 2 + 0.5)) / currentCount;
+                      const yBottom = (canvasHeight * (targetIdx * 2 + 1.5)) / currentCount;
+                      const yTarget = (canvasHeight * (targetIdx + 0.5)) / nextCount;
+                      const midX = connectorWidth / 2;
+
+                      return (
+                        <g key={targetIdx} stroke={isDarkMode ? '#475569' : '#94a3b8'} strokeWidth="2" fill="none">
+                          <path d={`M 0 ${yTop} H ${midX} V ${yTarget}`} strokeLinejoin="round" />
+                          <path d={`M 0 ${yBottom} H ${midX} V ${yTarget}`} strokeLinejoin="round" />
+                          <path d={`M ${midX} ${yTarget} H ${connectorWidth}`} strokeLinejoin="round" />
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+              )}
+
+              {isFinal && (
+                <div className="flex items-center pl-4 shrink-0">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 shadow-lg shadow-amber-500/10">
+                    <Trophy className="w-5 h-5" />
+                  </div>
+                </div>
+              )}
+
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function TournamentModule({ onBack, isDarkMode }: TournamentModuleProps) {
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Assistant de création
+  // Configuration initiale
   const [presentPlayers, setPresentPlayers] = useState<string[]>([]);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [title, setTitle] = useState('Tournoi du créneau');
@@ -80,14 +234,23 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
   const [pointsToWin] = useState(21);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Étape intermédiaire spécifique aux doubles & interversion manuelle
+  // Moteur automatique
+  const [suggestedStructure, setSuggestedStructure] = useState<TournamentStructure | null>(null);
+
+  // Étape intermédiaire doubles
   const [isPairingStep, setIsPairingStep] = useState(false);
   const [generatedPairs, setGeneratedPairs] = useState<DoublePair[]>([]);
   const [exemptPlayers, setExemptPlayers] = useState<string[]>([]);
   const [tempDuration, setTempDuration] = useState(7);
   const [playerToSwap, setPlayerToSwap] = useState<SelectedPlayerTarget | null>(null);
 
-  // Pop-up modal de saisie du temps tactile
+  // Prévisualisation du tirage
+  const [isPreviewStep, setIsPreviewStep] = useState(false);
+  const [activePreviewTab, setActivePreviewTab] = useState<'pools' | 'bracket'>('pools');
+  const [previewEntities, setPreviewEntities] = useState<string[]>([]);
+  const [previewPools, setPreviewPools] = useState<{ name: string; items: string[] }[]>([]);
+
+  // Modal tactile de durée
   const [showTimeModal, setShowTimeModal] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
@@ -96,12 +259,24 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
     loadTournamentData();
   }, []);
 
-  // Détermination automatique du nombre de terrains selon le format et les présents
   useEffect(() => {
     if (selectedPlayers.length === 0) return;
     const playersPerCourt = matchType === 'singles' ? 2 : 4;
     const recommended = Math.min(7, Math.max(1, Math.ceil(selectedPlayers.length / playersPerCourt)));
     setCourtsCount(recommended);
+  }, [selectedPlayers.length, matchType]);
+
+  useEffect(() => {
+    const entityCount = matchType === 'singles'
+      ? selectedPlayers.length
+      : Math.floor(selectedPlayers.length / 2);
+
+    if (entityCount >= 2) {
+      const struct = determineTournamentStructure(entityCount);
+      setSuggestedStructure(struct);
+    } else {
+      setSuggestedStructure(null);
+    }
   }, [selectedPlayers.length, matchType]);
 
   async function loadTournamentData() {
@@ -162,7 +337,8 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
       generatePairsList();
       setIsPairingStep(true);
     } else {
-      executeGenerateTournament(chosenDuration);
+      buildPreview([...selectedPlayers]);
+      setIsPreviewStep(true);
     }
   }
 
@@ -187,7 +363,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
     setPlayerToSwap(null);
   }
 
-  // Interversion de deux joueurs
   function handleSelectPlayerForSwap(target: SelectedPlayerTarget) {
     if (!playerToSwap) {
       setPlayerToSwap(target);
@@ -229,22 +404,119 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
     setPlayerToSwap(null);
   }
 
-  async function executeGenerateTournament(chosenDuration: number, prebuiltPairs?: DoublePair[]) {
-    const minRequired = matchType === 'singles' ? 2 : 4;
-    if (selectedPlayers.length < minRequired) return;
-    setIsGenerating(true);
+  function buildPreview(entities: string[]) {
+    setPreviewEntities(entities);
 
+    if (suggestedStructure && suggestedStructure.mode === 'pools_elimination') {
+      const poolsList: { name: string; items: string[] }[] = Array.from(
+        { length: suggestedStructure.poolsCount },
+        (_, i) => ({ name: `Poule ${String.fromCharCode(65 + i)}`, items: [] })
+      );
+
+      entities.forEach((entity, idx) => {
+        poolsList[idx % suggestedStructure.poolsCount].items.push(entity);
+      });
+      setPreviewPools(poolsList);
+      setActivePreviewTab('pools');
+    } else {
+      setPreviewPools([]);
+      setActivePreviewTab('bracket');
+    }
+  }
+
+  function handleValidatePairsAndGoToPreview() {
+    const formattedPairs = generatedPairs.map((p) => `${p.p1} & ${p.p2}`);
+    buildPreview(formattedPairs);
+    setIsPairingStep(false);
+    setIsPreviewStep(true);
+  }
+
+  function generateBracketRounds(stage: '8th' | 'quarter' | 'semi' | 'final', qualifiersCount: number) {
+    const rounds: BracketRound[] = [];
+    const isPoolsMode = suggestedStructure?.mode === 'pools_elimination';
+
+    if (stage === '8th' || qualifiersCount > 8) {
+      rounds.push({
+        title: 'Huitièmes',
+        matches: Array.from({ length: 8 }, (_, i) => {
+          const poolLetter1 = String.fromCharCode(65 + i);
+          const poolLetter2 = String.fromCharCode(65 + (15 - i));
+
+          return {
+            id: `8th-${i}`,
+            p1: isPoolsMode ? `1er Poule ${poolLetter1}` : (previewEntities[i * 2] || 'Exempt'),
+            p2: isPoolsMode ? `2e Poule ${poolLetter2}` : (previewEntities[i * 2 + 1] || 'Exempt'),
+          };
+        })
+      });
+    }
+
+    if (stage === 'quarter' || stage === '8th' || qualifiersCount >= 8) {
+      rounds.push({
+        title: 'Quarts de finale',
+        matches: Array.from({ length: 4 }, (_, i) => {
+          const poolLetter1 = String.fromCharCode(65 + i);
+          const poolLetter2 = String.fromCharCode(65 + (7 - i));
+
+          return {
+            id: `qf-${i}`,
+            p1: stage === 'quarter'
+              ? (isPoolsMode ? `1er Poule ${poolLetter1}` : previewEntities[i * 2] || 'Exempt')
+              : `Vainqueur H${i * 2 + 1}`,
+            p2: stage === 'quarter'
+              ? (isPoolsMode ? `2e Poule ${poolLetter2}` : previewEntities[i * 2 + 1] || 'Exempt')
+              : `Vainqueur H${i * 2 + 2}`,
+          };
+        })
+      });
+    }
+
+    if (stage !== 'final') {
+      rounds.push({
+        title: 'Demi-finales',
+        matches: Array.from({ length: 2 }, (_, i) => ({
+          id: `sf-${i}`,
+          p1: stage === 'semi'
+            ? (isPoolsMode ? `1er Poule ${String.fromCharCode(65 + i)}` : previewEntities[i * 2] || 'Exempt')
+            : `Vainqueur QF ${i * 2 + 1}`,
+          p2: stage === 'semi'
+            ? (isPoolsMode ? `2e Poule ${String.fromCharCode(65 + (3 - i))}` : previewEntities[i * 2 + 1] || 'Exempt')
+            : `Vainqueur QF ${i * 2 + 2}`,
+        }))
+      });
+    }
+
+    rounds.push({
+      title: 'Finale',
+      matches: [{
+        id: 'final',
+        p1: stage === 'final'
+          ? (isPoolsMode ? '1er Poule A' : previewEntities[0] || 'Joueur 1')
+          : 'Vainqueur Demi 1',
+        p2: stage === 'final'
+          ? (isPoolsMode ? '1er Poule B' : previewEntities[1] || 'Joueur 2')
+          : 'Vainqueur Demi 2',
+      }]
+    });
+
+    return rounds;
+  }
+
+  async function executeConfirmAndStart() {
+    setIsGenerating(true);
     try {
+      const formatStored = suggestedStructure?.mode || 'direct_elimination';
+
       const { data: tourney, error: tErr } = await supabase
         .from('tournaments')
         .insert([{
           title,
           date: today,
-          format: 'round_robin',
+          format: formatStored,
           match_type: matchType,
           scoring_mode: scoringMode,
           points_to_win: pointsToWin,
-          duration_minutes: chosenDuration,
+          duration_minutes: tempDuration,
           courts_count: courtsCount,
           status: 'in_progress'
         }])
@@ -255,57 +527,41 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
 
       let generatedMatches: any[] = [];
 
-      if (matchType === 'singles') {
-        const pool = [...selectedPlayers];
-        if (pool.length % 2 !== 0) pool.push('Exempt');
-
-        const totalRounds = Math.min(pool.length - 1, 5);
-
-        for (let r = 0; r < totalRounds; r++) {
-          let courtIdx = 1;
-          for (let i = 0; i < pool.length / 2; i++) {
-            const p1 = pool[i];
-            const p2 = pool[pool.length - 1 - i];
-
-            if (p1 !== 'Exempt' && p2 !== 'Exempt') {
-              const isFirstRoundActive = r === 0 && courtIdx <= courtsCount;
+      if (suggestedStructure?.mode === 'pools_elimination' && previewPools.length > 0) {
+        let courtIdx = 1;
+        previewPools.forEach((pool) => {
+          for (let i = 0; i < pool.items.length; i++) {
+            for (let j = i + 1; j < pool.items.length; j++) {
+              const isFirstRoundActive = generatedMatches.length < courtsCount;
               generatedMatches.push({
                 tournament_id: tourney.id,
                 court_number: isFirstRoundActive ? courtIdx : null,
-                round_number: r + 1,
-                player1_name: p1,
-                player2_name: p2,
+                round_number: 1,
+                player1_name: `${pool.items[i]} (${pool.name})`,
+                player2_name: `${pool.items[j]} (${pool.name})`,
                 score1: 0,
                 score2: 0,
                 status: isFirstRoundActive ? 'playing' : 'pending'
               });
-              courtIdx++;
+              if (isFirstRoundActive) courtIdx++;
             }
           }
-          pool.splice(1, 0, pool.pop()!);
-        }
+        });
       } else {
-        const pairsToUse = prebuiltPairs && prebuiltPairs.length > 0 
-          ? [...prebuiltPairs] 
-          : [...generatedPairs];
-
         let courtIdx = 1;
-        const totalMatches = Math.floor(pairsToUse.length / 2);
+        const totalMatches = Math.floor(previewEntities.length / 2);
 
         for (let i = 0; i < totalMatches; i++) {
-          const team1 = `${pairsToUse[i * 2].p1} & ${pairsToUse[i * 2].p2}`;
-          const team2 = `${pairsToUse[i * 2 + 1].p1} & ${pairsToUse[i * 2 + 1].p2}`;
-
-          const isActive = courtIdx <= courtsCount;
+          const isFirstRoundActive = courtIdx <= courtsCount;
           generatedMatches.push({
             tournament_id: tourney.id,
-            court_number: isActive ? courtIdx : null,
+            court_number: isFirstRoundActive ? courtIdx : null,
             round_number: 1,
-            player1_name: team1,
-            player2_name: team2,
+            player1_name: previewEntities[i * 2],
+            player2_name: previewEntities[i * 2 + 1],
             score1: 0,
             score2: 0,
-            status: isActive ? 'playing' : 'pending'
+            status: isFirstRoundActive ? 'playing' : 'pending'
           });
           courtIdx++;
         }
@@ -318,7 +574,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
 
       if (mErr) throw mErr;
 
-      setIsPairingStep(false);
+      setIsPreviewStep(false);
       setActiveTournament(tourney);
       setMatches(mData || []);
     } catch (err) {
@@ -370,6 +626,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
     setActiveTournament(null);
     setMatches([]);
     setIsPairingStep(false);
+    setIsPreviewStep(false);
     loadTournamentData();
   }
 
@@ -382,12 +639,15 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
   return (
     <div className="h-full w-full flex flex-col min-h-0 overflow-hidden font-sans select-none relative">
       
-      {/* Header contrasté */}
+      {/* HEADER */}
       <header className="w-full px-6 py-2.5 flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-3.5">
           <button
             onClick={() => {
-              if (isPairingStep) {
+              if (isPreviewStep) {
+                setIsPreviewStep(false);
+                if (matchType === 'doubles') setIsPairingStep(true);
+              } else if (isPairingStep) {
                 setIsPairingStep(false);
                 setPlayerToSwap(null);
               } else {
@@ -400,17 +660,23 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
           >
             <ArrowLeft className="w-4 h-4 text-blue-500 stroke-[2.8]" />
             <span className="text-xs sm:text-sm font-black">
-              {isPairingStep ? 'Modifier les réglages' : 'Retour'}
+              {isPreviewStep ? 'Retour modification' : isPairingStep ? 'Modifier réglages' : 'Retour'}
             </span>
           </button>
 
           <div>
             <h2 className={`text-sm sm:text-base font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-              {isPairingStep ? (title || 'Tournoi du créneau') : 'Tournois & Matchs en Direct'}
+              {isPreviewStep 
+                ? 'Tableau du Tournoi & Tirage' 
+                : isPairingStep 
+                ? (title || 'Tournoi du créneau') 
+                : 'Tournois & Matchs en Direct'}
             </h2>
             <p className="text-[11px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 uppercase tracking-wider">
               {activeTournament 
                 ? `${activeTournament.title} • ${activeTournament.match_type === 'doubles' ? 'Doubles' : 'Simples'}` 
+                : isPreviewStep
+                ? `Format : ${suggestedStructure?.mode === 'pools_elimination' ? 'Poules + Tableau' : 'Élimination Directe'}`
                 : isPairingStep 
                 ? 'Annonce & ajustement des paires'
                 : 'Configuration du créneau'}
@@ -433,15 +699,138 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
           <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
           <span className="text-sm font-bold">Chargement des terrains...</span>
         </div>
-      ) : isPairingStep ? (
+      ) : isPreviewStep ? (
 
-        /* ÉCRAN INTERMÉDIAIRE : ANNONCE & ÉCHANGE MANUEL DES PAIRES */
+        /* ÉCRAN DE PRÉVISUALISATION SANS CADRE REDONDANT */
         <main className="flex-1 w-full px-6 py-2 min-h-0 overflow-hidden flex flex-col justify-between">
           <div className={`w-full flex-1 rounded-2xl p-4 border flex flex-col justify-between min-h-0 overflow-hidden shadow-lg ${
             isDarkMode ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             
-            {/* Header de l'étape de composition */}
+            {/* Barre d'onglets épurée */}
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 shrink-0">
+              {suggestedStructure?.mode === 'pools_elimination' ? (
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setActivePreviewTab('pools')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
+                      activePreviewTab === 'pools' 
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-white/20' 
+                        : isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <Grid3X3 className="w-3.5 h-3.5" />
+                    <span>Phase de Poules ({suggestedStructure.poolsCount})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePreviewTab('bracket')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
+                      activePreviewTab === 'bracket' 
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-white/20' 
+                        : isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <GitBranch className="w-3.5 h-3.5" />
+                    <span>Arbre Final ({suggestedStructure.bracketStageLabel})</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                    <GitBranch className="w-4 h-4 stroke-[2.4]" />
+                  </div>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black uppercase text-indigo-400 block">
+                      Tableau à Élimination Directe
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Départ en {suggestedStructure?.bracketStageLabel} • {suggestedStructure?.totalQualified} participants
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center space-x-3">
+                <span className="text-[11px] font-bold text-slate-400">
+                  Total : <strong className="text-emerald-400">~{suggestedStructure?.totalMatchesEst} matchs</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Zone d'affichage libre sans double bordure intérieure */}
+            <div className="flex-1 min-h-0 overflow-hidden relative my-2">
+              {suggestedStructure?.mode === 'pools_elimination' && activePreviewTab === 'pools' ? (
+                <div className="h-full overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-1">
+                  {previewPools.map((pool, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`p-3 rounded-2xl border flex flex-col ${
+                        isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-700/60">
+                        <span className="text-xs font-black uppercase text-blue-400">{pool.name}</span>
+                        <span className="text-[10px] text-slate-400 font-bold">
+                          {suggestedStructure.qualifiersPerPool} sortant{suggestedStructure.qualifiersPerPool > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 flex-1">
+                        {pool.items.map((item, pIdx) => (
+                          <div 
+                            key={pIdx} 
+                            className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold truncate flex items-center justify-between ${
+                              isDarkMode 
+                                ? 'bg-slate-900/60 border-slate-800 text-slate-200' 
+                                : 'bg-white border-slate-300 text-slate-800 shadow-xs'
+                            }`}
+                          >
+                            <span className="truncate">{pIdx + 1}. {item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <TournamentBracketView 
+                  rounds={generateBracketRounds(
+                    suggestedStructure?.bracketStage || 'semi', 
+                    suggestedStructure?.totalQualified || 4
+                  )} 
+                  isDarkMode={isDarkMode} 
+                />
+              )}
+            </div>
+
+            {/* Bouton de confirmation */}
+            <button
+              disabled={isGenerating}
+              onClick={executeConfirmAndStart}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white text-xs sm:text-sm font-black shadow-lg shadow-emerald-600/30 cursor-pointer active:scale-[0.99] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0"
+            >
+              {isGenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>CONFIRMER LE TIRAGE & LANCER LES MATCHS EN DIRECT</span>
+                </>
+              )}
+            </button>
+
+          </div>
+        </main>
+
+      ) : isPairingStep ? (
+
+        /* ÉCRAN INTERMÉDIAIRE : COMPOSITION DES PAIRES (DOUBLES) */
+        <main className="flex-1 w-full px-6 py-2 min-h-0 overflow-hidden flex flex-col justify-between">
+          <div className={`w-full flex-1 rounded-2xl p-4 border flex flex-col justify-between min-h-0 overflow-hidden shadow-lg ${
+            isDarkMode ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            
             <div className="flex items-center justify-between shrink-0 pb-2.5 border-b border-slate-800/50">
               <div className="flex items-center space-x-2.5">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
@@ -477,13 +866,12 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               </div>
             </div>
 
-            {/* Bandeau d'état d'échange actif */}
             {playerToSwap && (
               <div className="my-1 px-3 py-1.5 rounded-xl bg-blue-600/15 border border-blue-500/40 text-blue-300 text-xs font-bold flex items-center justify-between shrink-0">
                 <div className="flex items-center space-x-2 truncate">
                   <ArrowLeftRight className="w-4 h-4 text-blue-400 shrink-0" />
                   <span className="truncate">
-                    Joueur sélectionné : <strong className="text-white underline">{playerToSwap.name}</strong> — Touchez le second joueur à échanger.
+                    Joueur sélectionné : <strong className="text-white underline">{playerToSwap.name}</strong> — Touchez le second joueur à permuter.
                   </span>
                 </div>
                 <span className="text-[10px] uppercase font-black tracking-wider bg-blue-600 text-white px-2 py-0.5 rounded-md">
@@ -492,7 +880,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               </div>
             )}
 
-            {/* Grille des paires en plein écran sans scroll */}
             <div className="flex-1 py-2 min-h-0 overflow-hidden flex flex-col justify-between">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 flex-1 min-h-0 overflow-y-auto no-scrollbar content-start">
                 {generatedPairs.map((pair) => {
@@ -508,7 +895,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                           : 'bg-slate-50 border-slate-200 shadow-xs'
                       }`}
                     >
-                      {/* En-tête de carte avec étiquette "Équipe X" haute lisibilité */}
                       <div className="flex items-center justify-between mb-2">
                         <span className="px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wide bg-blue-600 text-white shadow-xs ring-1 ring-white/10">
                           Équipe {pair.id}
@@ -522,7 +908,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                       </div>
 
                       <div className="space-y-1.5">
-                        {/* Bouton tactile Joueur 1 */}
                         <button
                           type="button"
                           onClick={() => handleSelectPlayerForSwap({ type: 'pair', pairId: pair.id, slot: 'p1', name: pair.p1 })}
@@ -539,7 +924,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
 
                         <div className="h-[1px] w-full bg-slate-700/30" />
 
-                        {/* Bouton tactile Joueur 2 */}
                         <button
                           type="button"
                           onClick={() => handleSelectPlayerForSwap({ type: 'pair', pairId: pair.id, slot: 'p2', name: pair.p2 })}
@@ -559,7 +943,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                 })}
               </div>
 
-              {/* Joueurs exempts éventuels */}
               {exemptPlayers.length > 0 && (
                 <div className="mt-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center justify-between shrink-0">
                   <div className="flex items-center space-x-2 truncate">
@@ -588,20 +971,12 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               )}
             </div>
 
-            {/* Bouton Suivant pour générer les terrains */}
             <button
-              disabled={isGenerating}
-              onClick={() => executeGenerateTournament(tempDuration)}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white text-xs sm:text-sm font-black shadow-lg shadow-blue-600/30 cursor-pointer active:scale-[0.99] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0"
+              onClick={handleValidatePairsAndGoToPreview}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white text-xs sm:text-sm font-black shadow-lg shadow-blue-600/30 cursor-pointer active:scale-[0.99] transition-all flex items-center justify-center space-x-2 shrink-0"
             >
-              {isGenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <span>VALIDER LES PAIRES & PASSER AUX TERRAINS</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
+              <span>VALIDER LES PAIRES & VOIR LE TIRAGE</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
 
           </div>
@@ -615,7 +990,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
             isDarkMode ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             
-            {/* En-tête de la carte */}
             <div className="flex items-center justify-between shrink-0 pb-2 border-b border-slate-800/50">
               <div className="flex items-center space-x-2.5">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
@@ -623,11 +997,10 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-black leading-tight">Configuration Express du Tournoi</h3>
-                  <p className="text-[11px] text-slate-400">Attribution automatique selon le format et les présents</p>
+                  <p className="text-[11px] text-slate-400">Paramétrez le créneau, l'algorithme génère la formule adaptée</p>
                 </div>
               </div>
 
-              {/* Badge d'information joueurs simultanés en haut à droite */}
               <div className={`px-3 py-1.5 rounded-xl border flex items-center space-x-2 text-xs font-bold shrink-0 ${
                 waitingPlayersCount > 0 
                   ? 'bg-amber-500/10 border-amber-500/40 text-amber-300' 
@@ -653,24 +1026,21 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               </div>
             </div>
 
-            {/* Corps en 2 colonnes */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 py-2 min-h-0 overflow-hidden">
               
-              {/* Colonne gauche : Paramètres */}
-              <div className="flex flex-col justify-around min-h-0 space-y-1.5">
+              <div className="flex flex-col justify-around min-h-0 space-y-2 overflow-y-auto no-scrollbar pr-1">
                 <div>
                   <label className="text-[11px] font-black text-slate-400 uppercase tracking-wide">Nom du tournoi</label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className={`w-full px-3 py-1.5 rounded-xl border text-xs sm:text-sm mt-0.5 font-bold outline-hidden ${
+                    className={`w-full px-3 py-2 rounded-xl border text-xs sm:text-sm mt-0.5 font-bold outline-hidden ${
                       isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
                     }`}
                   />
                 </div>
 
-                {/* 1. Discipline */}
                 <div>
                   <label className="text-[11px] font-black text-slate-400 uppercase tracking-wide">Discipline</label>
                   <div className="grid grid-cols-2 gap-2 mt-0.5">
@@ -702,7 +1072,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                   </div>
                 </div>
 
-                {/* 2. Terrains (1 à 7) */}
                 <div>
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-black text-slate-400 uppercase tracking-wide">Terrains utilisés (Max 7)</label>
@@ -714,7 +1083,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                         key={num}
                         type="button"
                         onClick={() => setCourtsCount(num)}
-                        className={`py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                        className={`py-2 rounded-lg text-xs sm:text-sm font-black transition-all cursor-pointer ${
                           courtsCount === num
                             ? 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-white/20'
                             : isDarkMode ? 'bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white' : 'bg-slate-100 border border-slate-300 text-slate-700 hover:text-slate-900'
@@ -726,7 +1095,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                   </div>
                 </div>
 
-                {/* 3. Format de match */}
                 <div>
                   <label className="text-[11px] font-black text-slate-400 uppercase tracking-wide">Format de match</label>
                   <div className="grid grid-cols-2 gap-2 mt-0.5">
@@ -759,7 +1127,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                 </div>
               </div>
 
-              {/* Colonne droite : Sélection des participants */}
+              {/* Colonne droite : Participants */}
               <div className="flex flex-col min-h-0 border-l border-slate-800/40 pl-4">
                 <div className="flex items-center justify-between mb-1.5 shrink-0">
                   <span className="text-[11px] font-black text-slate-400 uppercase tracking-wide">
@@ -806,7 +1174,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
 
             </div>
 
-            {/* Bouton de validation */}
             <button
               disabled={selectedPlayers.length < (matchType === 'singles' ? 2 : 4) || isGenerating}
               onClick={handleLaunchClick}
@@ -816,7 +1183,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               <span>
                 {matchType === 'doubles'
                   ? `COMPOSER LES PAIRES (${selectedPlayers.length} PARTICIPANTS)`
-                  : `LANCER LE TOURNOI (${selectedPlayers.length} PARTICIPANTS)`}
+                  : `PRÉVISUALISER LE TOURNOI (${selectedPlayers.length} PARTICIPANTS)`}
               </span>
             </button>
 
@@ -825,10 +1192,8 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
 
       ) : (
 
-        /* VUE EN DIRECT PAR TERRAIN SANS SCROLL */
+        /* MATCHS EN DIRECT */
         <main className="flex-1 w-full px-6 py-2 min-h-0 overflow-hidden flex flex-col justify-between">
-          
-          {/* TERRAINS EN DIRECT */}
           <div className="flex-[3] w-full min-h-0 flex flex-col pb-1.5">
             <div className="flex items-center space-x-2 mb-1.5 shrink-0">
               <Play className="w-3.5 h-3.5 text-blue-400" />
@@ -863,7 +1228,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
 
                     {liveMatch ? (
                       <div className="flex-1 flex flex-col justify-center space-y-1.5 min-h-0">
-                        {/* Côté 1 */}
                         <div className="flex items-center justify-between">
                           <span className="text-xs sm:text-sm font-black truncate max-w-[130px]" title={liveMatch.player1_name}>
                             {liveMatch.player1_name}
@@ -875,7 +1239,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
                           </div>
                         </div>
 
-                        {/* Côté 2 */}
                         <div className="flex items-center justify-between">
                           <span className="text-xs sm:text-sm font-black truncate max-w-[130px]" title={liveMatch.player2_name}>
                             {liveMatch.player2_name}
@@ -906,7 +1269,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
             </div>
           </div>
 
-          {/* FILE D'ATTENTE */}
           <div className="flex-[2] w-full min-h-0 flex flex-col pt-2 border-t border-slate-800/40">
             <div className="flex items-center justify-between mb-1.5 shrink-0">
               <div className="flex items-center space-x-2">
@@ -941,14 +1303,12 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
         </main>
       )}
 
-      {/* POP-UP MODAL TACTILE : CHOIX DE LA DURÉE DU MATCH */}
+      {/* MODAL TACTILE DE DURÉE */}
       {showTimeModal && (
         <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/60 flex items-center justify-center p-4">
           <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl flex flex-col justify-between transition-all ${
             isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
           }`}>
-            
-            {/* Header Modal */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-800/40">
               <div className="flex items-center space-x-2.5">
                 <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
@@ -970,7 +1330,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               </button>
             </div>
 
-            {/* Stepper tactile géant */}
             <div className="py-6 flex items-center justify-center space-x-6">
               <button
                 type="button"
@@ -998,7 +1357,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               </button>
             </div>
 
-            {/* Presets rapides */}
             <div className="grid grid-cols-4 gap-2 mb-6">
               {[5, 7, 8, 10, 12, 15, 20, 25].map((preset) => (
                 <button
@@ -1016,7 +1374,6 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               ))}
             </div>
 
-            {/* Bouton de confirmation */}
             <button
               onClick={() => processNextStep(durationMinutes)}
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white text-sm font-black shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 cursor-pointer"
@@ -1025,7 +1382,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               <span>
                 {matchType === 'doubles'
                   ? 'CONFIRMER ET COMPOSER LES PAIRES'
-                  : 'CONFIRMER ET LANCER LE TOURNOI'}
+                  : 'CONFIRMER ET VOIR LE TIRAGE'}
               </span>
             </button>
 
