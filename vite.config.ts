@@ -3,14 +3,15 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // Charge toutes les variables d'environnement
+  // Charge toutes les variables d'environnement (.env, .env.local, etc.)
   const env = loadEnv(mode, process.cwd(), '');
 
-  // Détection fiable de l'environnement DEV :
-  // 1. Branche Vercel égale à 'dev'
-  // 2. Ou URL Supabase pointant sur badzone-dev
-  // 3. Ou mode local 'development'
+  // Détection de l'environnement DEV :
+  // 1. Branche Git Vercel égale à 'dev'
+  // 2. Ou URL Supabase pointant vers la base de dev
+  // 3. Ou mode local 'development' (npm run dev)
   const gitBranch = process.env.VERCEL_GIT_COMMIT_REF || '';
   const isDev =
     gitBranch === 'dev' ||
@@ -26,14 +27,19 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: 'auto',
+        devOptions: {
+          enabled: true, // Permet de tester l'installation PWA et le Service Worker en local
+        },
         manifest: {
           name: appName,
           short_name: appName,
           description: 'Gestion des séances et tournois de badminton',
-          theme_color: '#0B0914',
-          background_color: '#0B0914',
+          start_url: '/',
           display: 'standalone',
           orientation: 'any',
+          background_color: '#0B0914',
+          theme_color: '#0B0914',
           icons: [
             {
               src: `/icons/icon-${iconSuffix}-192.png`,
@@ -56,8 +62,8 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     server: {
-      host: true,
-      allowedHosts: true,
+      host: true, // Permet d'accéder au serveur local depuis la tablette via le Wi-Fi
+      allowedHosts: true, // Autorise localtunnel et tous les sous-domaines
     },
   };
 });
