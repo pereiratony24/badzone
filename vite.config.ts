@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
           short_name: appName,
           description: 'Gestion des séances et tournois de badminton',
           start_url: '/',
-          display: 'standalone',
+          display: 'fullscreen',
           orientation: 'any',
           background_color: '#0B0914',
           theme_color: '#0B0914',
