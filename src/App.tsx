@@ -114,6 +114,10 @@ export default function App() {
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const [stats, setStats] = useState({ present: 0, total: 0 });
 
+  // Détection de l'environnement DEV via Supabase ou le mode de compilation Vite
+  const isDev = import.meta.env.VITE_SUPABASE_URL?.includes('dev') || import.meta.env.DEV;
+  const logoSrc = isDev ? '/icons/icon-dev-192.png' : '/icons/icon-prod-192.png';
+
   useEffect(() => {
     async function checkSupabaseConnection() {
       try {
@@ -207,12 +211,22 @@ export default function App() {
           onClick={() => setCurrentView('home')}
           className="flex items-center space-x-3 cursor-pointer select-none"
         >
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#FF4C85] to-[#8C52FF] flex items-center justify-center text-white font-black text-base shadow-lg shadow-pink-500/30">
-            BZ
+          {/* Remplacement du bloc BZ par l'icône dynamique */}
+          <img
+            src={logoSrc}
+            alt={isDev ? 'BadZone Dev' : 'BadZone'}
+            className="w-9 h-9 rounded-xl object-contain shadow-md shadow-pink-500/20"
+          />
+          <div className="flex items-center gap-1.5">
+            <span className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+              Bad<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF4C85] to-[#8C52FF]">Zone</span>
+            </span>
+            {isDev && (
+              <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-orange-500 text-white rounded-md shadow-sm">
+                DEV
+              </span>
+            )}
           </div>
-          <span className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-            Bad<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF4C85] to-[#8C52FF]">Zone</span>
-          </span>
         </div>
 
         {/* Bloc d'actions à droite : Réseau, Thème, puis Batterie tout à droite */}
