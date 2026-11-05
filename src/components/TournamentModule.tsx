@@ -89,8 +89,8 @@ function TournamentBracketView({ rounds, isDarkMode }: { rounds: BracketRound[];
 
   return (
     <div className="w-full h-full overflow-auto select-none p-2 sm:p-4 flex flex-col no-scrollbar">
-      {/* En-tête des étapes épuré, moderne et sans ligne parasite */}
-      <div className="flex items-center pb-4 mb-2 shrink-0 min-w-max">
+      {/* En-tête des étapes sticky en haut de la zone scrollable */}
+      <div className="flex items-center pb-4 mb-2 shrink-0 min-w-max sticky top-0 z-20">
         {rounds.map((round, rIdx) => {
           const isFinal = rIdx === rounds.length - 1;
           return (
@@ -103,8 +103,8 @@ function TournamentBracketView({ rounds, isDarkMode }: { rounds: BracketRound[];
                 isFinal 
                   ? 'bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-amber-500/15 border-amber-500/40 text-amber-400 shadow-amber-500/10' 
                   : isDarkMode 
-                  ? 'bg-slate-800/80 border-slate-700/70 text-slate-300' 
-                  : 'bg-white border-slate-200 text-slate-700 shadow-slate-100'
+                  ? 'bg-slate-800/90 border-slate-700/70 text-slate-300' 
+                  : 'bg-white/95 border-slate-200 text-slate-700 shadow-slate-100 backdrop-blur-xs'
               }`}>
                 {isFinal ? (
                   <Trophy className="w-3.5 h-3.5 text-amber-400 stroke-[2.5]" />
@@ -120,7 +120,7 @@ function TournamentBracketView({ rounds, isDarkMode }: { rounds: BracketRound[];
         })}
       </div>
 
-      {/* Arbre avec cartes et fourches de liaison SVG */}
+      {/* Arbre SVG */}
       <div 
         className="flex items-stretch min-w-max relative flex-1"
         style={{ height: `${canvasHeight}px` }}
@@ -637,9 +637,10 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
   const currentCourts = Array.from({ length: activeTournament?.courts_count || 4 }, (_, i) => i + 1);
 
   return (
-    <div className="h-full w-full flex flex-col min-h-0 overflow-hidden font-sans select-none relative">
+    /* Conteneur racine verrouillé à 100% de la hauteur sans scroll fenêtre */
+    <div className="h-screen max-h-screen w-full flex flex-col min-h-0 overflow-hidden font-sans select-none relative">
       
-      {/* HEADER */}
+      {/* HEADER FIXE */}
       <header className="w-full px-6 py-2.5 flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-3.5">
           <button
@@ -701,13 +702,13 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
         </div>
       ) : isPreviewStep ? (
 
-        /* ÉCRAN DE PRÉVISUALISATION SANS CADRE REDONDANT */
+        /* ÉCRAN DE PRÉVISUALISATION STRICTEMENT CADRÉ */
         <main className="flex-1 w-full px-6 py-2 min-h-0 overflow-hidden flex flex-col justify-between">
           <div className={`w-full flex-1 rounded-2xl p-4 border flex flex-col justify-between min-h-0 overflow-hidden shadow-lg ${
             isDarkMode ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             
-            {/* Barre d'onglets épurée */}
+            {/* Barre d'onglets fixe */}
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 shrink-0">
               {suggestedStructure?.mode === 'pools_elimination' ? (
                 <div className="flex items-center space-x-2">
@@ -759,7 +760,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               </div>
             </div>
 
-            {/* Zone d'affichage libre sans double bordure intérieure */}
+            {/* SEULE ZONE AUTORISÉE À DÉFILER DANS L'ÉCRAN */}
             <div className="flex-1 min-h-0 overflow-hidden relative my-2">
               {suggestedStructure?.mode === 'pools_elimination' && activePreviewTab === 'pools' ? (
                 <div className="h-full overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-1">
@@ -804,7 +805,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
               )}
             </div>
 
-            {/* Bouton de confirmation */}
+            {/* Bouton de confirmation figé en bas de la carte */}
             <button
               disabled={isGenerating}
               onClick={executeConfirmAndStart}
