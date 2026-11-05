@@ -77,7 +77,7 @@ export default function TournamentModule({ onBack, isDarkMode }: TournamentModul
   const [courtsCount, setCourtsCount] = useState(4);
   const [scoringMode, setScoringMode] = useState<'time' | 'points'>('time');
   const [durationMinutes, setDurationMinutes] = useState(7);
-  const [pointsToWin, setPointsToWin] = useState(21);
+  const [pointsToWin] = useState(21);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Étape intermédiaire spécifique aux doubles & interversion manuelle
